@@ -9,11 +9,11 @@ monitoring, dan membuat draft pesan WhatsApp dari angka aktual.
 
 ```
 pip install -r requirements.txt
-copy .env.example .env
+copy .env.example .env     → isi ADMIN_SHEET_URL (Proses 2) & ADMIN_SHEET_URL_PROSES1
 ```
 
-`.env` opsional — ID spreadsheet kedua proses sudah tertulis di
-`config.yaml` (`processes.proses1` / `processes.proses2`).
+`.env` wajib — link sheet admin kedua proses hanya disimpan di situ
+(tidak ada di `config.yaml`, dan `.env` tidak ikut ke git).
 
 Buat template workbook (sekali saja per proses):
 

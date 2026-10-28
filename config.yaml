@@ -167,8 +167,9 @@ processes:
   proses2:
     label: "Proses 2"
     short: "Proses 2 / Bolang"
-    spreadsheet_id: "12_ySxOZdtrjDv_Fvr4RzDYP13duHVbN1feVV6SPTkv4"
-    sheet_url: "https://docs.google.com/spreadsheets/d/12_ySxOZdtrjDv_Fvr4RzDYP13duHVbN1feVV6SPTkv4/edit"
+    # Link sheet admin diisi di .env: ADMIN_SHEET_URL / ADMIN_SPREADSHEET_ID
+    spreadsheet_id: ""
+    sheet_url: ""
     sheet_name: "DOWNTIME"
     sheet_header_row: 1
     env_url: "ADMIN_SHEET_URL"
@@ -184,8 +185,9 @@ processes:
   proses1:
     label: "Proses 1"
     short: "Proses 1 / Extrusion"
-    spreadsheet_id: "11IoJCHHsZLbmpO-u67diBolqsm0Kp7gDESstQh-rmLE"
-    sheet_url: "https://docs.google.com/spreadsheets/d/11IoJCHHsZLbmpO-u67diBolqsm0Kp7gDESstQh-rmLE/edit"
+    # Link sheet admin diisi di .env: ADMIN_SHEET_URL_PROSES1 / ADMIN_SPREADSHEET_ID_PROSES1
+    spreadsheet_id: ""
+    sheet_url: ""
     sheet_name: "Downtime"
     sheet_header_row: 3
     env_url: "ADMIN_SHEET_URL_PROSES1"

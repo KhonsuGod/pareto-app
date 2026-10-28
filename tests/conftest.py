@@ -8,14 +8,13 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import yaml
+import pytest
+
+from src.config import load_config
 
 
 def base_cfg() -> dict:
-    with open(ROOT / "config.yaml", "r", encoding="utf-8") as fh:
-        cfg = yaml.safe_load(fh)
-    cfg.setdefault("output", {})
-    return cfg
+    return load_config()
 
 
 def make_event(date="2026-10-27", machine="TFM 1", kode="BJ-PP00001-0",
