@@ -1,0 +1,98 @@
+"""ASCII art & tampilan menu CLI (tanpa dependency)."""
+from __future__ import annotations
+
+import os
+import sys
+
+# Kuning hanya untuk ASCII art (93 = bright yellow).
+YELLOW = "\033[93m"
+RESET = "\033[0m"
+
+_ansi_done = {"done": False}
+
+
+def _enable_ansi() -> None:
+    """Nyalakan virtual terminal di console Windows (cmd lama mati default)."""
+    if _ansi_done["done"] or not sys.stdout.isatty():
+        return
+    _ansi_done["done"] = True
+    if os.name == "nt":
+        try:
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            mode = ctypes.c_uint32()
+            if k32.GetConsoleMode(k32.GetStdHandle(-11), ctypes.byref(mode)):
+                k32.SetConsoleMode(k32.GetStdHandle(-11), mode.value | 0x0004)
+        except Exception:
+            pass
+
+# Font blok 5 baris. Lebar tiap glyph bebas; renderer yang meratakan.
+_GLYPHS: dict[str, list[str]] = {
+    "A": [" ### ", "#   #", "#####", "#   #", "#   #"],
+    "B": ["#### ", "#   #", "#### ", "#   #", "#### "],
+    "C": [" ####", "#    ", "#    ", "#    ", " ####"],
+    "D": ["#### ", "#   #", "#   #", "#   #", "#### "],
+    "E": ["#####", "#    ", "#### ", "#    ", "#####"],
+    "F": ["#####", "#    ", "#### ", "#    ", "#    "],
+    "G": [" ####", "#    ", "#  ##", "#   #", " ####"],
+    "H": ["#   #", "#   #", "#####", "#   #", "#   #"],
+    "I": ["###", " # ", " # ", " # ", "###"],
+    "J": ["  ###", "   # ", "   # ", "#  # ", " ##  "],
+    "K": ["#   #", "#  # ", "###  ", "#  # ", "#   #"],
+    "L": ["#    ", "#    ", "#    ", "#    ", "#####"],
+    "M": ["#   #", "## ##", "# # #", "#   #", "#   #"],
+    "N": ["#   #", "##  #", "# # #", "#  ##", "#   #"],
+    "O": [" ### ", "#   #", "#   #", "#   #", " ### "],
+    "P": ["#### ", "#   #", "#### ", "#    ", "#    "],
+    "Q": [" ### ", "#   #", "# # #", "#  # ", " ## #"],
+    "R": ["#### ", "#   #", "#### ", "#  # ", "#   #"],
+    "S": [" ####", "#    ", " ### ", "    #", "#### "],
+    "T": ["#####", "  #  ", "  #  ", "  #  ", "  #  "],
+    "U": ["#   #", "#   #", "#   #", "#   #", " ### "],
+    "V": ["#   #", "#   #", "#   #", " # # ", "  #  "],
+    "W": ["#   #", "#   #", "# # #", "## ##", "#   #"],
+    "X": ["#   #", " # # ", "  #  ", " # # ", "#   #"],
+    "Y": ["#   #", " # # ", "  #  ", "  #  ", "  #  "],
+    "Z": ["#####", "   # ", "  #  ", " #   ", "#####"],
+    " ": ["  ", "  ", "  ", "  ", "  "],
+    "-": ["   ", "   ", "---", "   ", "   "],
+    ".": [" ", " ", " ", " ", "#"],
+    "!": ["#", "#", "#", " ", "#"],
+}
+
+
+def render(text: str, spacing: int = 1) -> str:
+    """Render teks jadi ASCII art 5 baris (huruf besar)."""
+    lines = ["", "", "", "", ""]
+    gap = " " * spacing
+    for ch in text.upper():
+        glyph = _GLYPHS.get(ch)
+        if glyph is None:
+            glyph = _GLYPHS[" "]
+        width = max(len(g) for g in glyph)
+        for i in range(5):
+            lines[i] += glyph[i].ljust(width) + gap
+    return "\n".join(line.rstrip() for line in lines)
+
+
+def banner(title: str = "DIO BELAGAMA", subtitle: str = "PROSES MONITOR  |  DAILY DOWNTIME") -> str:
+    _enable_ansi()
+    art = render(title)
+    if sys.stdout.isatty():
+        art = f"{YELLOW}{art}{RESET}"
+    width = max(len(line) for line in art.splitlines())
+    rule = "=" * width
+    pad = max(0, (width - len(subtitle)) // 2)
+    return f"\n{art}\n{rule}\n{' ' * pad}{subtitle}\n{rule}\n"
+
+
+def box(title: str, lines: list[str], width: int = 62) -> str:
+    """Kotak ASCII sederhana untuk judul section menu."""
+    inner = width - 2
+    out = ["+" + "-" * inner + "+"]
+    out.append("| " + title[: inner - 2].ljust(inner - 2) + " |")
+    out.append("+" + "-" * inner + "+")
+    for line in lines:
+        out.append("| " + line[: inner - 2].ljust(inner - 2) + " |")
+    out.append("+" + "-" * inner + "+")
+    return "\n".join(out)

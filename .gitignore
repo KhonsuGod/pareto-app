@@ -1,0 +1,9 @@
+# cache & artefak build
+data/cache/
+data/output/
+data/template/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+.env

@@ -1,0 +1,331 @@
+# ============================================================ #
+# PROSES-MONITOR — konfigurasi daily monitoring                  #
+# Proses 1 & Proses 2. Yang sering berubah ubah di sini saja.    #
+# ============================================================ #
+
+project:
+  name: "PROSES-MONITOR"
+  area: "BOLANG"
+
+# Proses yang dipakai kalau menu dibuka
+default_process: proses2
+
+google:
+  fetcher: "auto"            # auto | xlsx_export | gspread
+  timeout_seconds: 60
+
+# ------------------------------------------------------------ #
+# Default global (dipakai Proses 2; Proses 1 override di bawah) #
+# ------------------------------------------------------------ #
+columns:
+  tgl: "TGL"
+  mesin: "MESIN"
+  kode_barang: "KODE BARANG"
+  nama_produk: "NAMA PRODUK"
+  jam_mulai: "JAM MULAI"
+  jam_selesai: "JAM SELESAI"
+  total_jam: "TOTAL (JAM)"
+  total_menit: "TOTAL (MENIT)"
+  keterangan: "KETERANGAN"
+  kategori: "KATEGORI"
+
+date:
+  input_format: "%Y-%m-%d"
+  cell_format: "yyyy-mm-dd"
+
+kategori_labels:
+  A: "MTC"
+  B: "PRD"
+  C: "TS"
+  D: "BAHAN"
+  E: "QC/RND"
+  F: "PPIC"
+  G: "WS"
+
+machine_grouping:
+  mode: "strip_dot"          # TFM 1.1 -> TFM 1 ; WM.2 -> WM ; nama asli tetap ada
+
+issue_mapping:
+  order:
+    - tunggu_bahan
+    - plug_assist
+    - stacking
+    - robot
+    - mould
+    - insert
+    - ejector
+    - pisau_cutting
+    - alarm_mesin
+    - conveyor
+    - printing
+    - changeover
+    - material_handling
+    - material_quality
+    - other
+  groups:
+    tunggu_bahan:
+      label: "Tunggu Bahan"
+      keywords: ["tunggu bahan", "tunggu material", "tunggu artikel", "menunggu bahan"]
+    plug_assist:
+      label: "Plug Assist / Produk Nempel"
+      keywords: ["plug", "nempel", "semprot produk", "semprot plug", "cabut bekuan"]
+    stacking:
+      label: "Stacking / Stacker"
+      keywords: ["stacking", "stacker", "stackingan"]
+    robot:
+      label: "Robot"
+      keywords: ["robot", "jari robot", "selang robot"]
+    mould:
+      label: "Mould"
+      keywords: ["mould", "mold", "cavity", "frame mould"]
+    insert:
+      label: "Insert"
+      keywords: ["insert", "injektor"]
+    ejector:
+      label: "Ejector"
+      keywords: ["ejector", "ejektor"]
+    pisau_cutting:
+      label: "Pisau / Cutting"
+      keywords: ["pisau", "potong", "blanket", "plate", "cutting"]
+    alarm_mesin:
+      label: "Alarm Mesin"
+      keywords: ["alarm"]
+    conveyor:
+      label: "Conveyor"
+      keywords: ["kompayer", "conveyor", "rantai", "infeed", "belt"]
+    printing:
+      label: "Printing"
+      keywords: ["print", "foil", "striper"]
+    changeover:
+      label: "Changeover"
+      keywords: ["changeover", "ganti produk", "ganti ukuran", "setting mc"]
+    material_handling:
+      label: "Material Handling"
+      keywords: ["sambung bahan", "bahan putus", "bahan lepas", "bahan jatuh", "ganti bahan",
+                 "balik bahan", "turunin bahan", "nyangkut"]
+    material_quality:
+      label: "Material / Quality"
+      keywords: ["quality", "kualitas", "bintik", "warping"]
+    other:
+      label: "Other"
+      keywords: []
+
+output:
+  output_dir: "data/output"
+  latest_name: "Monitoring_Proses2_LATEST.xlsx"
+  dated_name: "Monitoring_Proses2_{date}.xlsx"
+  backup_dir: "data/output/backups"
+  backup_keep: 10
+  cache_dir: "data/cache"
+  template: "data/template/Template_Monitoring_Proses2.xlsx"
+
+ringkasan:
+  top_n: 5
+  fokus_days: 7
+
+followup:
+  priorities:
+    P1: 120
+    P2: 60
+  status: "OPEN"
+  action_template: "Follow up alarm {machine} yang masih berulang."
+  include_monitor_row: true
+
+# ------------------------------------------------------------ #
+# Draft pesan WhatsApp (deterministic, dari angka aktual)       #
+# ------------------------------------------------------------ #
+message:
+  recipient: "@mr lukman cjm"
+  cc: "Pak Dio"
+  header: "Update Pareto {label} Pak {recipient} Di tanggal {day}:"
+  top_machines: 4
+  driver_machines: 2
+  drivers_per_machine: 4
+  closing: "Tolong dibantu follow up yang masih berulang."
+  drivers:
+    - {phrase: "perbaikan rantai", keywords: ["perbaikan rantai", "rantai kendor", "rantai lepas", "rantai putus", "rantai ketat", "chain"]}
+    - {phrase: "pisau", keywords: ["pisau", "cutting", "blanket"]}
+    - {phrase: "alarm temperatur", keywords: ["temperatur", "temperature", "suhu", "heater"]}
+    - {phrase: "plug assist", keywords: ["plug"]}
+    - {phrase: "alarm lubrication", keywords: ["lubrication", "lubricant", "oli", "grease"]}
+    - {phrase: "KMD", keywords: ["kmd"]}
+    - {phrase: "ejector", keywords: ["ejector", "ejektor"]}
+    - {phrase: "stacking", keywords: ["stacking", "stacker"]}
+    - {phrase: "mould / seal", keywords: ["mould", "mold", "seal"]}
+    - {phrase: "robot", keywords: ["robot"]}
+    - {phrase: "conveyor", keywords: ["kompayer", "conveyor"]}
+    - {phrase: "alarm foil", keywords: ["foil"]}
+    - {phrase: "alarm drives", keywords: ["drives", "drive"]}
+    - {phrase: "ganti ukuran", keywords: ["dekel", "dekal", "ganti ukuran"]}
+    - {phrase: "tunggu bahan", keywords: ["tunggu bahan", "menunggu bahan", "tunggu material"]}
+    - {phrase: "alarm mesin", keywords: ["alarm"]}
+
+# ------------------------------------------------------------ #
+# Proses                                                     #
+# ------------------------------------------------------------ #
+processes:
+  proses2:
+    label: "Proses 2"
+    short: "Proses 2 / Bolang"
+    spreadsheet_id: "12_ySxOZdtrjDv_Fvr4RzDYP13duHVbN1feVV6SPTkv4"
+    sheet_url: "https://docs.google.com/spreadsheets/d/12_ySxOZdtrjDv_Fvr4RzDYP13duHVbN1feVV6SPTkv4/edit"
+    sheet_name: "DOWNTIME"
+    sheet_header_row: 1
+    env_url: "ADMIN_SHEET_URL"
+    env_id: "ADMIN_SPREADSHEET_ID"
+    output:
+      output_dir: "data/output"
+      latest_name: "Monitoring_Proses2_LATEST.xlsx"
+      dated_name: "Monitoring_Proses2_{date}.xlsx"
+      backup_dir: "data/output/backups"
+      template: "data/template/Template_Monitoring_Proses2.xlsx"
+    state_file: "data/cache/state.json"
+
+  proses1:
+    label: "Proses 1"
+    short: "Proses 1 / Extrusion"
+    spreadsheet_id: "11IoJCHHsZLbmpO-u67diBolqsm0Kp7gDESstQh-rmLE"
+    sheet_url: "https://docs.google.com/spreadsheets/d/11IoJCHHsZLbmpO-u67diBolqsm0Kp7gDESstQh-rmLE/edit"
+    sheet_name: "Downtime"
+    sheet_header_row: 3
+    env_url: "ADMIN_SHEET_URL_PROSES1"
+    env_id: "ADMIN_SPREADSHEET_ID_PROSES1"
+
+    # Kolom sheet admin Proses 1: TGL, MESIN, JAM, SELESAI, TOTAL (JAM),
+    # TOTAL (MENIT), DESCRIPTION, Jenis Downtime
+    columns:
+      tgl: "TGL"
+      mesin: "MESIN"
+      kode_barang: ""
+      nama_produk: ""
+      jam_mulai: "JAM"
+      jam_selesai: "SELESAI"
+      total_jam: "TOTAL (JAM)"
+      total_menit: "TOTAL (MENIT)"
+      keterangan: "DESCRIPTION"
+      kategori: "Jenis Downtime"
+
+    kategori_labels:
+      LT: "LOST TIME"
+      A: "MAINTENANCE"
+      B: "PRODUKSI"
+      C: "PPIC"
+      D: "QC/R&D"
+
+    issue_mapping:
+      order:
+        - ganti_ukuran
+        - mpa
+        - sparepart
+        - calender
+        - chiller
+        - listrik
+        - angin
+        - hidrolik
+        - take_off
+        - loader
+        - dies
+        - filter
+        - heater
+        - material
+        - quality
+        - setting
+        - cleaning
+        - other
+      groups:
+        ganti_ukuran:
+          label: "Ganti Ukuran / Dekel"
+          keywords: ["dekel", "dekal", "dkeel", "ganti ukuran"]
+        mpa:
+          label: "MPA Error"
+          keywords: ["mpa"]
+        sparepart:
+          label: "Tunggu Sparepart"
+          keywords: ["sparepart", "spare part", "tunggu spare"]
+        calender:
+          label: "Calender"
+          keywords: ["calender", "kalandar"]
+        chiller:
+          label: "Chiller"
+          keywords: ["chiller"]
+        listrik:
+          label: "Listrik / Trip"
+          keywords: ["mati lampu", "listrik", "ngetrip", "ngetrif", "pln"]
+        angin:
+          label: "Angin / Kompresor"
+          keywords: ["angin", "kompresor", "compressor"]
+        hidrolik:
+          label: "Hidrolik"
+          keywords: ["hidrolic", "hydraulic", "hidrolik"]
+        take_off:
+          label: "Take Off"
+          keywords: ["take off", "take-off", "takeof"]
+        loader:
+          label: "Auto Loader"
+          keywords: ["auto loader", "autoloader", "loader"]
+        dies:
+          label: "Dies"
+          keywords: ["dies"]
+        filter:
+          label: "Filter"
+          keywords: ["filter"]
+        heater:
+          label: "Heater"
+          keywords: ["heater", "pemanas"]
+        material:
+          label: "Bahan / Material"
+          keywords: ["resin habis", "bahan habis", "tunggu bahan", "kuras bahan", "bahan baku"]
+        quality:
+          label: "Quality"
+          keywords: ["bintik", "warna", "gumpalan", "kualitas"]
+        setting:
+          label: "Setting Awal"
+          keywords: ["setting", "awal masuk", "start"]
+        cleaning:
+          label: "Cleaning"
+          keywords: ["cleaning", "bersih"]
+        other:
+          label: "Other"
+          keywords: []
+
+    followup:
+      priorities:
+        P1: 480
+        P2: 240
+      status: "OPEN"
+      action_template: "Follow up downtime {machine} yang masih berulang."
+      include_monitor_row: true
+
+    # PLUG_ASSIST / TUNGGU_BAHAN tidak relevan untuk extrusion
+    workbook_optional:
+      plug_assist: false
+      tunggu_bahan: false
+
+    message:
+      recipient: "@mr lukman cjm"
+      cc: "Pak Dio"
+      drivers:
+        - {phrase: "ganti ukuran/dekel", keywords: ["dekel", "dekal", "dkeel", "ganti ukuran"]}
+        - {phrase: "MPA error", keywords: ["mpa"]}
+        - {phrase: "tunggu sparepart", keywords: ["sparepart", "spare part"]}
+        - {phrase: "calender", keywords: ["calender"]}
+        - {phrase: "chiller", keywords: ["chiller"]}
+        - {phrase: "listrik trip", keywords: ["listrik", "ngetrip", "ngetrif", "mati lampu"]}
+        - {phrase: "angin/kompresor", keywords: ["angin", "kompresor"]}
+        - {phrase: "hidrolik", keywords: ["hidrolic", "hydraulic"]}
+        - {phrase: "take off", keywords: ["take off", "takeof"]}
+        - {phrase: "auto loader", keywords: ["loader"]}
+        - {phrase: "dies", keywords: ["dies"]}
+        - {phrase: "filter", keywords: ["filter"]}
+        - {phrase: "heater", keywords: ["heater", "pemanas"]}
+        - {phrase: "bahan", keywords: ["resin habis", "bahan habis", "tunggu bahan", "kuras"]}
+        - {phrase: "quality", keywords: ["bintik", "warna", "gumpalan"]}
+        - {phrase: "setting awal", keywords: ["setting", "awal masuk"]}
+
+    output:
+      output_dir: "data/output/proses1"
+      latest_name: "Monitoring_Proses1_LATEST.xlsx"
+      dated_name: "Monitoring_Proses1_{date}.xlsx"
+      backup_dir: "data/output/proses1/backups"
+      template: "data/template/Template_Monitoring_Proses1.xlsx"
+    state_file: "data/cache/state_proses1.json"
