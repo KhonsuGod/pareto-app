@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 
 # Kuning hanya untuk ASCII art (93 = bright yellow).
@@ -75,15 +76,27 @@ def render(text: str, spacing: int = 1) -> str:
     return "\n".join(line.rstrip() for line in lines)
 
 
-def banner(title: str = "DIO BELAGAMA", subtitle: str = "PROSES MONITOR  |  DAILY DOWNTIME") -> str:
+def banner(title: str = "DIO BELAGAMA",
+           subtitle: str = "PROSES MONITOR  |  DAILY DOWNTIME",
+           byline: tuple[str, ...] = ("tools by davi", "support bryan adam")) -> str:
+    """Banner utama: ASCII art + subtitle di tengah console, byline di bawah."""
     _enable_ansi()
     art = render(title)
+    art_w = max(len(line) for line in art.splitlines())
+    term_w = max(art_w, shutil.get_terminal_size((80, 24)).columns)
+
+    def center(text: str) -> str:
+        pad = max(0, (term_w - len(text)) // 2)
+        return " " * pad + text
+
+    rule = "=" * art_w
+    out = [center(line) for line in art.splitlines()]
+    out += [center(rule), center(subtitle), center(rule)]
+    out += [center(line) for line in byline]
+    body = "\n".join(out)
     if sys.stdout.isatty():
-        art = f"{YELLOW}{art}{RESET}"
-    width = max(len(line) for line in art.splitlines())
-    rule = "=" * width
-    pad = max(0, (width - len(subtitle)) // 2)
-    return f"\n{art}\n{rule}\n{' ' * pad}{subtitle}\n{rule}\n"
+        body = f"{YELLOW}{body}{RESET}"
+    return f"\n{body}\n"
 
 
 def box(title: str, lines: list[str], width: int = 62) -> str:
