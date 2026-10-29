@@ -2,6 +2,7 @@
 data/cache/
 data/output/
 data/template/
+data/spare/
 .pytest_cache/
 __pycache__/
 *.pyc

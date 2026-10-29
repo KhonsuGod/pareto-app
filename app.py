@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -23,10 +24,12 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from src import (  # noqa: E402
+    anim,
     downtime as dow,
     extractor,
     google_sheet,
     logger,
+    launcher,
     menu,
     message,
     pareto,
@@ -37,6 +40,10 @@ from src import (  # noqa: E402
 )
 from src.config import load_config  # noqa: E402
 from src.issue_mapper import IssueMapper  # noqa: E402
+from src.tooling import cli as spare_cli  # noqa: E402
+from src.tooling import service as spare_service  # noqa: E402
+from src.tooling.pareto import pareto as spare_pareto  # noqa: E402
+from src.tooling.repository import SpareStore  # noqa: E402
 
 
 def _fmt_date(d: dt.date) -> str:
@@ -290,6 +297,162 @@ def cmd_validate(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# tooling & spare (Tool 2)
+# --------------------------------------------------------------------------- #
+def cmd_tooling_find(args) -> int:
+    store = SpareStore(load_config())
+    rows = spare_service.find_tooling(store, args.query)
+    if not rows:
+        logger.err(f"Tidak ada hasil di MASTER TOOLING untuk '{args.query}'.")
+        return 1
+    print(f"{len(rows)} hasil untuk '{args.query}':")
+    for r in rows:
+        unverified = " [BELUM TERVERIFIKASI]" if r.unverified() else ""
+        print(f"  No.{r.no} | {r.family} | {r.kode_bj or '(tanpa Kode BJ)'}{unverified}")
+        print(f"    Produk : {r.nama_produk or '-'}")
+        print(f"    Mesin  : {r.mesin or '-'} | Cavity: {r.cavity if r.cavity is not None else '-'}")
+        parts = ", ".join(f"{name}={val}" for name, val in
+                          (("Mould", r.mould), ("Insert", r.insert),
+                           ("Plug Assist", r.plug_assist), ("Ejector", r.ejector)) if val)
+        print(f"    Komponen: {parts or 'CEK TS (belum terverifikasi)'}")
+    return 0
+
+
+def _spare_date(args, which: str) -> dt.date | None:
+    raw = getattr(args, which, None)
+    if not raw:
+        return None
+    try:
+        return dt.datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        raise SystemExit(f"Format tanggal tidak valid: {raw} (gunakan YYYY-MM-DD)")
+
+
+def cmd_spare_status(args) -> int:
+    spare_cli._status(load_config())
+    return 0
+
+
+def cmd_spare_pareto(args) -> int:
+    cfg = load_config()
+    store = SpareStore(cfg)
+    today = dt.date.today()
+    if args.period == "today":
+        start = end = today
+    elif args.period == "week":
+        start, end = today - dt.timedelta(days=6), today
+    elif args.period == "month":
+        start, end = today.replace(day=1), today
+    else:
+        start, end = _spare_date(args, "from"), _spare_date(args, "to")
+    result = spare_pareto(store.read_log(store.load()), start=start, end=end, top=5)
+    print(f"PARETO PEMAKAIAN SPARE — {start or 'awal'} s/d {end or 'sekarang'}")
+    if result["n_tx"] == 0:
+        print("Belum ada transaksi pada periode ini.")
+        return 0
+    for dim in ("component", "family", "machine"):
+        rows, total = result[dim]
+        print(f"\nPer {dim} (total {total}):")
+        if not rows:
+            print("  (kosong)")
+        for i, r in enumerate(rows, start=1):
+            print(f"  {i}. {r['name']:<26} {r['qty']:>4} ({r['freq']}x) "
+                  f"{r['pct']*100:5.1f}% kum {r['cum_pct']*100:5.1f}%")
+    return 0
+
+
+def cmd_spare_history(args) -> int:
+    store = SpareStore(load_config())
+    rows = spare_service.history(store, _spare_date(args, "from"),
+                                 _spare_date(args, "to") or dt.date.today(),
+                                 args.family or "", args.component or "")
+    if not rows:
+        print("Tidak ada transaksi pada filter ini.")
+        return 0
+    print(f"RIWAYAT ({len(rows)} transaksi)")
+    for t in rows[-30:]:
+        print(f"  {t.date} {t.jam or '-'} | {t.family:<24} {t.component:<14} "
+              f"qty={t.qty:<3} {t.mesin:<6} {t.kode_bj:<14} {t.pic}")
+    return 0
+
+
+def cmd_spare_daily(args) -> int:
+    day = _spare_date(args, "date") or dt.date.today()
+    s = spare_service.daily_summary(SpareStore(load_config()), day)
+    print(f"DAILY SUMMARY SPARE — {s['date']}")
+    print(f"  Transaksi OUT : {s['n_tx']}")
+    print(f"  Total qty     : {s['total_qty']}")
+    if s["top_component"]:
+        print(f"  Top komponen  : {s['top_component'][0]} = {s['top_component'][1]}")
+    if s["top_family"]:
+        print(f"  Top family    : {s['top_family'][0]} = {s['top_family'][1]}")
+    print(f"  Stock alarm   : {len(s['alarms'])}")
+    return 0
+
+
+def cmd_spare_whatsapp(args) -> int:
+    cfg = load_config()
+    store = SpareStore(cfg)
+    day = _spare_date(args, "date") or dt.date.today()
+    text = spare_service.whatsapp_summary(store, day)
+    print(text, end="")
+    out_dir = SpareStore(cfg).workbook_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"Draft_WhatsApp_Spare_{day.isoformat()}.txt"
+    path.write_text(text, encoding="utf-8")
+    logger.ok(f"Disimpan: {path}")
+    if getattr(args, "clip", False):
+        from src.message import _copy_clipboard
+        logger.ok("Disalin ke clipboard." if _copy_clipboard(text) else "Gagal menyalin.")
+    return 0
+
+
+def cmd_spare_opname(args) -> int:
+    """Opname lewat CLI: python app.py spare opname --family F --component C --physical N"""
+    cfg = load_config()
+    store = SpareStore(cfg)
+    family = args.family or input("  Tooling Family: ").strip()
+    component = args.component or input("  Sparepart: ").strip()
+    raw = args.physical if args.physical is not None else input("  Jumlah fisik: ").strip()
+    try:
+        physical = int(raw)
+    except ValueError:
+        logger.err("Jumlah fisik harus bilangan bulat >= 0.")
+        return 1
+    try:
+        res = spare_service.opname(store, family=family, component=component, physical=physical,
+                                   pic=args.pic or "", reason=args.reason or "")
+    except ValueError as exc:
+        logger.err(str(exc))
+        return 1
+    logger.ok("Opname tercatat")
+    print(f"  Tipe: {res['kind']} | fisik: {res['physical']} | Stock Awal baru: {res['new_awal']}"
+          + (f" | selisih: {res['diff']}" if res["previous"] is not None else ""))
+    print(f"  ID ledger: {res['entry_id']}")
+    return 0
+
+
+def cmd_spare_correlate(args) -> int:
+    cfg = load_config()
+    store = SpareStore(cfg)
+    start, end = _spare_date(args, "from"), _spare_date(args, "to")
+    try:
+        rows = spare_service.downtime_correlation(store, aliases=(cfg.get("spare") or {}).get("downtime_aliases"),
+                                                  start=start, end=end)
+    except RuntimeError as exc:
+        logger.warn(str(exc))
+        return 1
+    if not rows:
+        print("Belum ada data untuk dikorelasikan.")
+        return 0
+    print(f"{'Komponen':<16} {'Downtime':>9} {'Spare':>6}")
+    for r in rows:
+        print(f"{r['component']:<16} {r['downtime_mentions']:>9} {r['spare_out']:>6}")
+    print("Indikator operasional saja, bukan klaim sebab-akibat.")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 # menu callbacks
 # --------------------------------------------------------------------------- #
 class _Args:
@@ -340,6 +503,37 @@ def _menu_open_output(key: str) -> None:
     print(f"  Membuka {out_dir}")
 
 
+def _menu_open_spare_output() -> None:
+    store = SpareStore(load_config())
+    out_dir = store.workbook_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    import os
+    os.startfile(out_dir)  # type: ignore[attr-defined]
+    print(f"  Membuka {out_dir}")
+
+
+# --------------------------------------------------------------------------- #
+# launcher dua tool
+# --------------------------------------------------------------------------- #
+def _run_launcher(no_animation: bool) -> int:
+    logger.init(False)
+    cfg = load_config()
+    if no_animation or os.getenv("MONITOR_NO_ANIMATION") or os.getenv("NO_COLOR"):
+        animate = False
+    else:
+        animate = anim.enabled()
+    return launcher.run(cfg, {
+        "tool1": lambda: menu.run(cfg, {
+            "update": _menu_update,
+            "status": _menu_status,
+            "draft": _menu_draft,
+            "validate": _menu_validate,
+            "open_output": _menu_open_output,
+        }, title="DAILY PRODUCTION MONITORING", back=True),
+        "tool2": lambda: spare_cli.run(cfg),
+    }, animate=animate)
+
+
 # --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
@@ -349,16 +543,11 @@ def _add_proses(p) -> None:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    no_animation = "--no-animation" in argv
+    if no_animation:
+        argv.remove("--no-animation")
     if not argv:
-        logger.init(False)
-        cfg = load_config()
-        return menu.run(cfg, {
-            "update": _menu_update,
-            "status": _menu_status,
-            "draft": _menu_draft,
-            "validate": _menu_validate,
-            "open_output": _menu_open_output,
-        })
+        return _run_launcher(no_animation)
 
     ap = argparse.ArgumentParser(
         prog="python app.py",
@@ -395,6 +584,52 @@ def main(argv=None) -> int:
     p_st = sub.add_parser("status", help="status pipeline")
     _add_proses(p_st)
     p_st.set_defaults(func=cmd_status)
+
+    p_tool = sub.add_parser("tooling", help="lookup MASTER TOOLING (read-only)")
+    tool_sub = p_tool.add_subparsers(dest="tooling_cmd", required=True)
+    p_find = tool_sub.add_parser("find", help="cari Kode BJ / produk / family / mesin")
+    p_find.add_argument("query", help="kata kunci")
+    p_find.set_defaults(func=cmd_tooling_find)
+
+    p_spare = sub.add_parser("spare", help="Tool 2: tooling & spare monitoring")
+    spare_sub = p_spare.add_subparsers(dest="spare_cmd", required=True)
+    p_ss = spare_sub.add_parser("status", help="status stock semua komponen")
+    p_ss.set_defaults(func=cmd_spare_status)
+
+    p_sp = spare_sub.add_parser("pareto", help="pareto pemakaian spare")
+    p_sp.add_argument("period", nargs="?", choices=["today", "week", "month", "range"], default="month")
+    p_sp.add_argument("--from", dest="from", metavar="YYYY-MM-DD")
+    p_sp.add_argument("--to", dest="to", metavar="YYYY-MM-DD")
+    p_sp.set_defaults(func=cmd_spare_pareto)
+
+    p_sh = spare_sub.add_parser("history", help="riwayat pengeluaran")
+    p_sh.add_argument("--from", dest="from", metavar="YYYY-MM-DD")
+    p_sh.add_argument("--to", dest="to", metavar="YYYY-MM-DD")
+    p_sh.add_argument("--family")
+    p_sh.add_argument("--component")
+    p_sh.set_defaults(func=cmd_spare_history)
+
+    p_sd = spare_sub.add_parser("daily", help="ringkasan harian spare")
+    p_sd.add_argument("--date", metavar="YYYY-MM-DD")
+    p_sd.set_defaults(func=cmd_spare_daily)
+
+    p_sw = spare_sub.add_parser("whatsapp", help="draft WhatsApp spare")
+    p_sw.add_argument("--date", metavar="YYYY-MM-DD")
+    p_sw.add_argument("--clip", action="store_true", help="salin ke clipboard")
+    p_sw.set_defaults(func=cmd_spare_whatsapp)
+
+    p_so = spare_sub.add_parser("opname", help="stock opname / opening / adjustment")
+    p_so.add_argument("--family")
+    p_so.add_argument("--component")
+    p_so.add_argument("--physical", metavar="N", help="jumlah fisik")
+    p_so.add_argument("--pic")
+    p_so.add_argument("--reason")
+    p_so.set_defaults(func=cmd_spare_opname)
+
+    p_sc = spare_sub.add_parser("correlate", help="korelasi downtime vs spare (indikator)")
+    p_sc.add_argument("--from", dest="from", metavar="YYYY-MM-DD")
+    p_sc.add_argument("--to", dest="to", metavar="YYYY-MM-DD")
+    p_sc.set_defaults(func=cmd_spare_correlate)
 
     args = ap.parse_args(argv)
     logger.init(verbose=bool(getattr(args, "verbose", False)))

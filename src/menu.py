@@ -43,24 +43,35 @@ def _header(cfg: dict) -> None:
     print(LINE)
 
 
-def run(cfg: dict, actions: dict) -> int:
+def run(cfg: dict, actions: dict, title: str | None = None, back: bool = False) -> int | str:
     """actions: update(proses, date), status(), draft(proses, date),
-    validate(proses), open_output(proses)."""
-    print(banner.banner())
+    validate(proses), open_output(proses).
+
+    back=True  -> pilihan 0 jadi 'Kembali ke launcher', return "back".
+    title      -> tampilkan judul section, bukan banner penuh (mode submenu).
+    """
+    if title:
+        print(LINE)
+        print(f"  {title}")
+        print(LINE)
+    else:
+        print(banner.banner())
+    exit_label = "0. Kembali ke launcher" if back else "0. Keluar"
     while True:
-        _header(cfg)
+        if not title:
+            _header(cfg)
         print("  1. Update data Proses 2")
         print("  2. Update data Proses 1")
-        print("  3. Lihat status")
+        print("  3. Lihat status produksi")
         print("  4. Buat draft pesan WhatsApp")
         print("  5. Validasi workbook")
         print("  6. Buka folder hasil")
-        print("  0. Keluar")
+        print(f"  {exit_label}")
         try:
             choice = input("\n  Pilih menu: ").strip()
         except EOFError:
             print()
-            return 0
+            return "back" if back else 0
 
         try:
             if choice == "1":
@@ -86,6 +97,8 @@ def run(cfg: dict, actions: dict) -> int:
                 if key is not None:
                     actions["open_output"](key)
             elif choice in ("0", "q", "keluar", "exit"):
+                if back:
+                    return "back"
                 print("  Selesai.")
                 return 0
             else:
@@ -95,8 +108,10 @@ def run(cfg: dict, actions: dict) -> int:
         except Exception as exc:  # jangan matikan menu karena satu error
             print(f"\n  [ERROR] {exc}")
 
+        if back and choice in ("0", "q", "keluar", "exit"):
+            return "back"
         print()
         try:
             input("  Tekan Enter untuk kembali ke menu...")
         except EOFError:
-            return 0
+            return "back" if back else 0

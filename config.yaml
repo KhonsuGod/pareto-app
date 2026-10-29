@@ -161,8 +161,31 @@ message:
     - {phrase: "alarm mesin", keywords: ["alarm"]}
 
 # ------------------------------------------------------------ #
-# Proses                                                     #
+# Tool 2 - Tooling & Spare Monitoring (Proses 2)               #
 # ------------------------------------------------------------ #
+spare:
+  # Workbook kerja lokal (app menulis di sini). Impor pertama dari source.
+  workbook: "data/spare/monitorung_spare_proses2.xlsx"
+  # Sumber asli (baca-saja, untuk impor pertama)
+  source_workbook: "Z:/davi/monitoring_sparepart/monitorung_spare_proses2.xlsx"
+  backup_dir: "data/spare/backups"
+  backup_keep: 10
+  state_file: "data/spare/state.json"
+
+  # Minimum stock per Family -> Komponen. Isi sendiri setelah stock
+  # terverifikasi. Contoh skema (JANGAN dianggap nilai asli):
+  #   DATAR-12:
+  #     PLUG ASSIST: 2
+  #     EJECTOR: 1
+  minimum_stock: {}
+
+  # Alias ejaan untuk korelasi downtime (keyword -> sebutan di keterangan)
+  downtime_aliases:
+    PLUG ASSIST: ["plug", "plugassist", "plug asist", "nempel"]
+    MOULD: ["mould", "mold"]
+    EJECTOR: ["ejector", "ejektor"]
+
+
 processes:
   proses2:
     label: "Proses 2"
