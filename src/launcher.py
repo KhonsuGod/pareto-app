@@ -5,33 +5,36 @@ tidak pernah menyentuh logika Tool 1 / Tool 2.
 """
 from __future__ import annotations
 
-import os
+import sys
 
 from . import anim, banner, menu
 
 LINE = "-" * 64
 
 
-def _screen(title: str) -> None:
-    print(banner.banner())
-    print(menu.LINE)
-    print(f"  {title}")
-    print(menu.LINE)
+def _startup(animate: bool) -> None:
+    """Banner DIO BELAGAMA + byline. Animasi: reveal ASCII per baris."""
+    if not animate or not anim.enabled():
+        print(banner.banner())
+        return
+    art, tail = banner.parts()
+    sys.stdout.write(banner.YELLOW)
+    for line in art.splitlines():
+        anim.typewriter(line, seconds=0.1)   # 5 baris art ~0.5s
+    anim.dots("Loading interface", seconds=0.4)
+    sys.stdout.write(tail + "\n" + banner.RESET)
+    anim.ready("SYSTEM READY")
 
 
 def run(cfg: dict, actions: dict, animate: bool = True) -> int:
-    """actions: tool1(), tool2(), open_output_spare() — dipasang di app.py."""
-    if animate:
-        anim.progress("INITIALIZING PRODUCTION MONITOR", seconds=0.7)
-        anim.typewriter("PRODUCTION MONITOR - PLANT BOLANG", seconds=0.35)
-        anim.ready("SYSTEM READY")
-    else:
-        print("PRODUCTION MONITOR - PLANT BOLANG")
+    """actions: tool1(), tool2() — dipasang di app.py."""
+    _startup(animate)
 
+    first = True  # banner sudah tampil di _startup, jangan dobel
     while True:
-        print()
-        print(LINE)
-        print("  PRODUCTION MONITOR - PLANT BOLANG")
+        if not first:
+            print(banner.banner())
+        first = False
         print(LINE)
         print("  [1] DAILY PRODUCTION MONITORING")
         print("      Proses 1 / Proses 2 / Downtime / Pareto")

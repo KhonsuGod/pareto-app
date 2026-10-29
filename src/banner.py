@@ -62,6 +62,13 @@ _GLYPHS: dict[str, list[str]] = {
 }
 
 
+TITLE = "DIO BELAGAMA"
+SUBTITLE = "PROSES MONITOR  |  DAILY DOWNTIME"
+BYLINE = ("tools by : davi",
+          "support : bryan addam",
+          "github : github.com/KhonsuGod/pareto-app")
+
+
 def render(text: str, spacing: int = 1) -> str:
     """Render teks jadi ASCII art 5 baris (huruf besar)."""
     lines = ["", "", "", "", ""]
@@ -76,9 +83,9 @@ def render(text: str, spacing: int = 1) -> str:
     return "\n".join(line.rstrip() for line in lines)
 
 
-def banner(title: str = "DIO BELAGAMA",
-           subtitle: str = "PROSES MONITOR  |  DAILY DOWNTIME",
-           byline: tuple[str, ...] = ("tools by davi", "support bryan adam")) -> str:
+def banner(title: str = TITLE,
+           subtitle: str = SUBTITLE,
+           byline: tuple[str, ...] = BYLINE) -> str:
     """Banner utama: ASCII art + subtitle di tengah console, byline di bawah."""
     _enable_ansi()
     art = render(title)
@@ -97,6 +104,29 @@ def banner(title: str = "DIO BELAGAMA",
     if sys.stdout.isatty():
         body = f"{YELLOW}{body}{RESET}"
     return f"\n{body}\n"
+
+
+def parts(title: str = TITLE,
+          subtitle: str = SUBTITLE,
+          byline: tuple[str, ...] = BYLINE) -> tuple[str, str]:
+    """(ASCII art ter-center, ekor rule+subtitle+byline) tanpa warna.
+
+    Untuk animasi reveal di launcher: art di-reveal dulu, ekor menyusul.
+    """
+    _enable_ansi()
+    art = render(title)
+    art_w = max(len(line) for line in art.splitlines())
+    term_w = max(art_w, shutil.get_terminal_size((80, 24)).columns)
+
+    def center(text: str) -> str:
+        pad = max(0, (term_w - len(text)) // 2)
+        return " " * pad + text
+
+    centered = "\n".join(center(line) for line in art.splitlines())
+    rule = "=" * art_w
+    tail = "\n".join([center(rule), center(subtitle), center(rule)]
+                     + [center(line) for line in byline])
+    return centered, tail
 
 
 def box(title: str, lines: list[str], width: int = 62) -> str:

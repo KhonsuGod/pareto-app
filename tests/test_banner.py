@@ -40,12 +40,13 @@ def test_banner_byline_and_centering(monkeypatch):
 
     monkeypatch.setattr(banner.shutil, "get_terminal_size", lambda *a, **k: _Term)
     out = banner.banner()
-    assert "tools by davi" in out
-    assert "support bryan adam" in out
+    assert "tools by : davi" in out
+    assert "support : bryan addam" in out
+    assert "github.com/KhonsuGod/pareto-app" in out
     lines = [line for line in out.splitlines() if line.strip()]
     # setiap baris di-center: tengah teks aslinya jatuh di tengah terminal (kolom 50)
     for line in lines:
         pad = len(line) - len(line.lstrip(" "))
         raw_center = pad + (len(line) - pad) / 2
         assert abs(raw_center - 50) <= 1
-    assert any(line.strip() == "tools by davi" for line in lines)
+    assert any(line.strip() == "tools by : davi" for line in lines)
