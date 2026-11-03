@@ -3,6 +3,7 @@ data/cache/
 data/output/
 data/template/
 data/spare/
+data/wa_profile/
 .pytest_cache/
 __pycache__/
 *.pyc

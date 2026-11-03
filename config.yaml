@@ -185,6 +185,32 @@ spare:
     MOULD: ["mould", "mold"]
     EJECTOR: ["ejector", "ejektor"]
 
+# ------------------------------------------------------------ #
+# Rekap downtime bulanan (file Excel bergaya REKAP ... BULANAN) #
+# ------------------------------------------------------------ #
+recap:
+  # Template per proses = file contoh rekap yang sudah diformat user
+  # (formula Excel di dalamnya yang menghitung; Python hanya isi nilai).
+  templates:
+    proses1: "data/template/REKAP DOWNTIME BULANAN PROSES 1 - OKTOBER 2026.xlsx"
+    proses2: "data/template/REKAP DOWNTIME BULANAN PROSES 2 - OKTOBER 2026.xlsx"
+
+# ------------------------------------------------------------ #
+# Kirim draft langsung ke grup WhatsApp (WhatsApp Web)          #
+# ------------------------------------------------------------ #
+whatsapp:
+  # Nama grup HARUS sama persis dengan nama grup di WhatsApp.
+  groups:
+    proses1: "Extruder Bolang"
+    proses2: "Setter & t.s & produksi"
+  # Browser untuk WhatsApp Web (sesi login tersimpan di browser_profile).
+  # Scan QR cukup sekali: python app.py wa login
+  browser_channel: "msedge"        # "msedge" atau "chrome"
+  browser_profile: "data/wa_profile"
+  attach_chart: true               # lampirkan gambar pareto di draft
+  open_timeout: 120                # detik menunggu WA Web siap
+  send_timeout: 45                 # detik per langkah saat mengirim
+
 
 processes:
   proses2:

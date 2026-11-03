@@ -36,6 +36,14 @@ def _pick_date() -> str | None:
     return raw or None
 
 
+def _pick_month() -> str | None:
+    try:
+        raw = input("  Bulan rekap YYYY-MM (Enter = bulan berjalan): ").strip()
+    except EOFError:
+        return None
+    return raw or None
+
+
 def _header(cfg: dict) -> None:
     procs = " + ".join(label for _k, label in processes.available(cfg))
     print(LINE)
@@ -66,6 +74,7 @@ def run(cfg: dict, actions: dict, title: str | None = None, back: bool = False) 
         print("  4. Buat draft pesan WhatsApp")
         print("  5. Validasi workbook")
         print("  6. Buka folder hasil")
+        print("  7. Rekap downtime bulanan")
         print(f"  {exit_label}")
         try:
             choice = input("\n  Pilih menu: ").strip()
@@ -96,6 +105,11 @@ def run(cfg: dict, actions: dict, title: str | None = None, back: bool = False) 
                 key = _pick_process(cfg)
                 if key is not None:
                     actions["open_output"](key)
+            elif choice == "7":
+                key = _pick_process(cfg)
+                if key is not None:
+                    month = _pick_month()
+                    actions["recap"](key, month)
             elif choice in ("0", "q", "keluar", "exit"):
                 if back:
                     return "back"

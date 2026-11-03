@@ -317,8 +317,34 @@ def _whatsapp_menu(cfg) -> None:
     try:
         if input("  Salin ke clipboard? [y/N]: ").strip().lower() == "y":
             print("  Disalin." if _copy_clipboard(text) else "  Gagal menyalin.")
+        if input("  Kirim ke grup WA sekarang? [y/N]: ").strip().lower() == "y":
+            _send_spare_wa(cfg, text, day)
     except EOFError:
         pass
+
+
+def _send_spare_wa(cfg, text, day) -> None:
+    from .. import wa_chart, wa_send
+    try:
+        group = wa_send.group_for(cfg, "proses2")
+    except wa_send.WaError as exc:
+        print(f"  [INFO] {exc}")
+        return
+    image = None
+    try:
+        image = wa_chart.spare_chart(cfg, day)
+    except Exception:
+        image = None
+    print(f"  Mengirim ke grup '{group}' lewat WhatsApp Web...")
+    try:
+        res = wa_send.send_to_group(cfg, group_name=group, text=text, image=image)
+    except wa_send.WaError as exc:
+        print(f"  [ERROR] {exc}")
+        return
+    if res.get("verified"):
+        print("  [OK] Terkirim.")
+    else:
+        print("  [WARN] Cek WhatsApp Web (kirim tidak terverifikasi otomatis).")
 
 
 def _correlate_menu(cfg) -> None:

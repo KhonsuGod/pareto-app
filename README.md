@@ -62,6 +62,7 @@ Python 3.12 yang benar dan langsung membuka **launcher dua tool**:
     4. Buat draft pesan WhatsApp
     5. Validasi workbook
     6. Buka folder hasil
+    7. Rekap downtime bulanan
     0. Kembali ke launcher
 
 [2] TOOLING & SPARE MONITORING    → submenu Tool 2 (lihat seksi 7)
@@ -109,6 +110,7 @@ python app.py draft --proses 2 --clip           # draft WhatsApp, salin ke clipb
 python app.py draft --proses 1 --date 2026-10-27
 python app.py validate [--proses 1|2]
 python app.py status [--proses 1|2]             # last processed / source / workbook
+python app.py recap --proses 2 --month 2026-11  # rekap downtime bulanan (Excel)
 ```
 
 Simpan otomatis:
@@ -151,8 +153,37 @@ downtime harian, kontribusi Pareto ≈ 100%, kumulatif terakhir = 100%, dan
 tidak ada `#REF!/#DIV/0!/#VALUE!/#N/A`.
 **Jika gagal, workbook tidak disimpan dan LATEST tidak ditimpa.**
 
-## 6. Konfigurasi
+## 5b. Rekap downtime bulanan
 
+Membuat file Excel rekap sebulan penuh per proses, mengikuti format templat
+yang sudah ada:
+
+```
+python app.py recap --proses 2 --month 2026-11
+python app.py recap --proses 1 --month 2026-11
+# tanpa --month = bulan berjalan; lewat menu: Tool 1 → pilihan 7
+```
+
+- Output: `REKAP DOWNTIME BULANAN PROSES [1|2] - <BULAN> <TAHUN>.xlsx` di
+  folder output proses masing-masing. Jalankan ulang → file lama dibackup ke
+  `backups/` lalu dibangun ulang dari awal (tanpa state sisa).
+- Templat per proses diatur di `config.yaml` → `recap.templates` (file contoh
+  Excel di `data/template/`). Layout dibaca dari templat itu sendiri —
+  posisi header, jumlah kolom, baris rank, range formula — jadi templat bisa
+  diedit tanpa ubah kode.
+- **Excel yang menghitung.** Formula COUNTIF/SUMIF/kontribusi/kumulatif di
+  dalam templat dibiarkan hidup; Python hanya mengisi nilai: baris DATA
+  DOWNTIME, nama rank PARETO MESIN & ISSUE (urutan = aturan pareto Tool 1:
+  menit desc, nama asc), tanggal TREND HARIAN, judul bulan/tahun/periode.
+- Proses 1 (extrusion): kolom **Tipe Durasi** REGULER/LT diisi dari kategori
+  (`LT...` → LT, lainnya REGULER), termasuk pemisahan REGULER vs LT per mesin.
+- Grafik/objek/formula di templat dipertahankan. Range data `$2320` etc.
+  diperpanjang otomatis kalau data bulan baru melewatinya.
+- Bulan tanpa data tetap diproduksi (rekap kosong, dengan warning) dan
+  divalidasi sebelum disimpan (tanggal dalam bulan, jumlah baris = jumlah
+  event, tidak ada `#REF`).
+
+## 6. Konfigurasi
 Semua yang sering berubah diatur lewat `config.yaml`:
 
 - `processes.<key>` — spreadsheet ID, nama sheet, posisi header

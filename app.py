@@ -453,12 +453,141 @@ def cmd_spare_correlate(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# kirim ke WhatsApp (wa login / send)
+# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# rekap downtime bulanan
+# --------------------------------------------------------------------------- #
+def cmd_recap(args) -> int:
+    from src import recap
+
+    try:
+        cfg = _cfg(getattr(args, "proses", None))
+        info = recap.build(cfg, getattr(args, "month", None))
+    except recap.RecapError as exc:
+        print()
+        logger.err(str(exc))
+        return 1
+    print()
+    logger.ok(f"Rekap {info['label']} - {info['month']} selesai")
+    print(f"  File        : {info['path']}")
+    print(f"  Event       : {info['n_events']} ({info['n_days']} hari kalender)")
+    print(f"  Mesin/Issue : {info['n_machines']} mesin, {info['n_issues']} jenis issue")
+    if info["extended"]:
+        print(f"  Rentang formula diperpanjang: {info['extended']} sel")
+    for w in info["warnings"]:
+        logger.warn(w)
+    return 0
+
+
+def _send_via_wa(cfg: dict, text: str, image) -> bool:
+    """Kirim ke grup sesuai config, cetak hasil. True = terkirim."""
+    from src import wa_send
+    try:
+        group = wa_send.group_for(cfg)
+        res = wa_send.send_to_group(cfg, group_name=group, text=text, image=image)
+    except wa_send.WaError as exc:
+        print()
+        logger.err(str(exc))
+        return False
+    if res.get("verified"):
+        logger.ok(f"Terkirim ke grup '{res['group']}'"
+                  + (f" + gambar: {Path(res['image']).name}" if res.get("image") else ""))
+        return True
+    logger.warn("Terkirim? Tidak terverifikasi otomatis — cek jendela WhatsApp Web.")
+    return True
+
+
+def cmd_wa_login(args) -> int:
+    from src import wa_send
+    try:
+        wa_send.open_for_login(load_config())
+    except wa_send.WaError as exc:
+        logger.err(str(exc))
+        return 1
+    return 0
+
+
+def _send_tool1_process(args) -> int:
+    cfg = _cfg(getattr(args, "proses", None))
+    target = _parse_date_arg(cfg, getattr(args, "date", None))
+    text, target = message.build_from_workbook(cfg, target)
+
+    image = None
+    if not getattr(args, "no_chart", False):
+        ws_cfg = cfg.get("whatsapp") or {}
+        if ws_cfg.get("attach_chart", True):
+            try:
+                from src import wa_chart
+                image = wa_chart.machine_chart(cfg, target)
+            except Exception:
+                image = None  # chart gagal -> kirim teks saja
+
+    group = (cfg.get("whatsapp") or {}).get("groups", {}).get(cfg.get("process_key", ""), "")
+    print(f"\nDRAFT PESAN - {cfg['process_short']} - {dow.short_date(target)} {target.year}")
+    print("-" * 64)
+    print(text, end="")
+    print("-" * 64)
+    print(f"  Grup tujuan : {group or '(belum diisi di config.yaml)'}")
+    if image:
+        print(f"  Lampiran    : {Path(image).name}")
+    if not getattr(args, "yes", False):
+        try:
+            if input("\n  Kirim sekarang? [y/N]: ").strip().lower() != "y":
+                print("  Dibatalkan. Draft tetap tersimpan.")
+                return 1
+        except EOFError:
+            return 1
+    return 0 if _send_via_wa(cfg, text, image) else 1
+
+
+def _send_spare(args) -> int:
+    cfg = load_config()
+    store = SpareStore(cfg)
+    day = _spare_date(args, "date") or dt.date.today()
+    text = spare_service.whatsapp_summary(store, day)
+
+    image = None
+    if not getattr(args, "no_chart", False):
+        if (cfg.get("whatsapp") or {}).get("attach_chart", True):
+            try:
+                from src import wa_chart
+                image = wa_chart.spare_chart(cfg, day)
+            except Exception:
+                image = None
+
+    group = (cfg.get("whatsapp") or {}).get("groups", {}).get("proses2", "")
+    print("\nDRAFT WHATSAPP SPARE")
+    print("-" * 64)
+    print(text, end="")
+    print("-" * 64)
+    print(f"  Grup tujuan : {group or '(belum diisi di config.yaml)'}")
+    if image:
+        print(f"  Lampiran    : {Path(image).name}")
+    if not getattr(args, "yes", False):
+        try:
+            if input("\n  Kirim sekarang? [y/N]: ").strip().lower() != "y":
+                print("  Dibatalkan. Draft tetap tersimpan.")
+                return 1
+        except EOFError:
+            return 1
+    return 0 if _send_via_wa(cfg, text, image) else 1
+
+
+def cmd_send(args) -> int:
+    if getattr(args, "what", None) == "spare":
+        return _send_spare(args)
+    return _send_tool1_process(args)
+
+
+# --------------------------------------------------------------------------- #
 # menu callbacks
 # --------------------------------------------------------------------------- #
 class _Args:
     def __init__(self, **kw):
         self.proses = kw.get("proses")
         self.date = kw.get("date")
+        self.month = kw.get("month")
         self.latest = kw.get("latest", False)
         self.verbose = kw.get("verbose", False)
         self.force = kw.get("force", False)
@@ -486,12 +615,25 @@ def _menu_draft(key: str, date: str | None) -> None:
     try:
         if input("  Salin ke clipboard? [y/N]: ").strip().lower() == "y":
             print("  Disalin." if _copy_clipboard(text) else "  Gagal menyalin.")
+        if input("  Kirim ke grup WA sekarang? [y/N]: ").strip().lower() == "y":
+            image = None
+            if (cfg.get("whatsapp") or {}).get("attach_chart", True):
+                try:
+                    from src import wa_chart
+                    image = wa_chart.machine_chart(cfg, target)
+                except Exception:
+                    image = None
+            _send_via_wa(cfg, text, image)
     except EOFError:
         pass
 
 
 def _menu_validate(key: str) -> None:
     cmd_validate(_Args(proses=key))
+
+
+def _menu_recap(key: str, month: str | None) -> None:
+    cmd_recap(_Args(proses=key, month=month))
 
 
 def _menu_open_output(key: str) -> None:
@@ -529,6 +671,7 @@ def _run_launcher(no_animation: bool) -> int:
             "draft": _menu_draft,
             "validate": _menu_validate,
             "open_output": _menu_open_output,
+            "recap": _menu_recap,
         }, title="DAILY PRODUCTION MONITORING", back=True),
         "tool2": lambda: spare_cli.run(cfg),
     }, animate=animate)
@@ -630,6 +773,24 @@ def main(argv=None) -> int:
     p_sc.add_argument("--from", dest="from", metavar="YYYY-MM-DD")
     p_sc.add_argument("--to", dest="to", metavar="YYYY-MM-DD")
     p_sc.set_defaults(func=cmd_spare_correlate)
+
+    p_wa = sub.add_parser("wa", help="WhatsApp Web: login sekali (scan QR)")
+    p_wa.set_defaults(func=cmd_wa_login)
+
+    p_rec = sub.add_parser("recap", help="rekap downtime bulanan file Excel")
+    _add_proses(p_rec)
+    p_rec.add_argument("--month", metavar="YYYY-MM",
+                       help="bulan rekap (default: bulan berjalan)")
+    p_rec.set_defaults(func=cmd_recap)
+
+    p_send = sub.add_parser("send", help="kirim draft + pareto ke grup WhatsApp")
+    p_send.add_argument("what", nargs="?", choices=["spare"], default=None,
+                        help="'spare' = draft Tool 2; kosong = draft Tool 1")
+    p_send.add_argument("--proses", choices=["1", "2", "proses1", "proses2"])
+    p_send.add_argument("--date", metavar="YYYY-MM-DD")
+    p_send.add_argument("--no-chart", action="store_true", help="tanpa gambar pareto")
+    p_send.add_argument("--yes", action="store_true", help="tanpa konfirmasi y/n")
+    p_send.set_defaults(func=cmd_send)
 
     args = ap.parse_args(argv)
     logger.init(verbose=bool(getattr(args, "verbose", False)))
